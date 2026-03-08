@@ -1,11 +1,18 @@
 import os
 import logging.config
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+TZ = ZoneInfo('Asia/Bangkok')
 
 BASE_DIR = Path(__file__).resolve().parent
-ROOT_DIR = BASE_DIR.parent.parent
+ROOT_DIR = BASE_DIR.parent
+
+load_dotenv(ROOT_DIR / '.env')
+
+DB_PATH = BASE_DIR / os.getenv('DB_PATH')
 
 # ------------------------------------ Logging ------------------------------------
 LOGGING = {
@@ -40,16 +47,3 @@ LOGGING = {
 }
 
 logging.config.dictConfig(LOGGING)
-
-
-# ------------------------------------ Settings ------------------------------------
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=ROOT_DIR / '.env',
-        env_file_encoding='utf-8',
-    )
-
-    BOT_TOKEN: str = os.getenv('BOT_TOKEN')
-
-
-settings = Settings()

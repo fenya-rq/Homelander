@@ -1,0 +1,8 @@
+ddl = """
+CREATE TABLE IF NOT EXISTS users (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    tg_id      INTEGER NOT NULL UNIQUE,
+    username   TEXT,
+    created_at DATETIME NOT NULL
+);
+"""
