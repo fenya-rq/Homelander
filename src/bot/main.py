@@ -5,8 +5,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from src.bot.config import settings
+from src.bot.conf import settings
 from src.bot import handlers
+from src.storage.runner import migrate
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,10 @@ dp.include_router(handlers.router)  # stub
 
 
 async def main() -> None:
-    logger.info('Bot started')
+    logger.info('Start migration...')
+    await migrate()
+
+
     await dp.start_polling(bot)
 
 
