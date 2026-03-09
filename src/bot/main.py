@@ -25,7 +25,6 @@ async def main() -> None:
     logger.info('Start migration...')
     await migrate()
 
-    logger.info('Bot started')
 
     await dp.start_polling(bot)
 
