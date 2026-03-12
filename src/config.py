@@ -14,6 +14,8 @@ load_dotenv(ROOT_DIR / '.env')
 
 DB_PATH = BASE_DIR / os.getenv('DB_PATH')
 
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
 # ------------------------------------ Logging ------------------------------------
 LOGGING = {
     "version": 1,

@@ -4,6 +4,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from src.ai.client import get_response
 from src.bot.helpers import parse_data
 from src.storage.db import get_or_create_user, get_user_id, save_feed_block
 
@@ -37,18 +38,25 @@ async def cmd_start(message: Message) -> None:
 
 
 @router.message(Command('day'))
-async def cmd_start(message: Message) -> None:
+async def day_report(message: Message) -> None:
     await message.answer('stub for /day')
 
 
 @router.message(Command('yesterday'))
-async def cmd_start(message: Message) -> None:
+async def yesterday_report(message: Message) -> None:
     await message.answer('stub for /day')
 
 
+# @router.message()
+# async def feed_handler(message: Message) -> None:
+#     feed_block = await parse_data(message.text, message.date)
+#     user_id = await get_user_id(message.from_user.id)
+#     await save_feed_block(user_id, feed_block)
+#     await message.answer('ok')
+
+
+# TODO: extend for save to db and return some stats instead `feed_handler` above
 @router.message()
-async def feed_handler(message: Message) -> None:
-    feed_block = await parse_data(message.text, message.date)
-    user_id = await get_user_id(message.from_user.id)
-    await save_feed_block(user_id, feed_block)
-    await message.answer('ok')
+async def func_test(message: Message) -> None:
+    llm_response = await get_response(message.text)
+    await message.answer(f'Ответ от LLM:\n{llm_response}')
