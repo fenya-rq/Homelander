@@ -218,3 +218,5 @@ __marimo__/
 ex.py
 tree.md
 **.db
+**.db-shm
+**.db-wal

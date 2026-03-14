@@ -8,8 +8,24 @@ from src.config import DB_PATH, TZ
 logger = logging.getLogger(__name__)
 
 
+async def save_migration_file(name: str) -> None:
+    """Сохраняет информацию о выполненной миграции в базу данных."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('PRAGMA journal_mode=WAL;')
+        await db.execute('PRAGMA foreign_keys = ON')
+
+        current_ts = datetime.now(tz=TZ)
+        await db.execute(
+            'INSERT OR IGNORE INTO migrations (filename, applied_at) VALUES (?, ?)',
+            (name, current_ts),
+        )
+        await db.commit()
+        logger.debug('Saved migration %s at %s', name, current_ts)
+
+
 async def get_or_create_user(tg_id: int, username: str | None) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('PRAGMA journal_mode=WAL;')
         await db.execute('PRAGMA foreign_keys = ON')
 
         current_ts = datetime.now(tz=TZ)
@@ -37,21 +53,28 @@ async def get_user_id(tg_id: int) -> int:
             return row[0]
 
 
-async def save_feed_block(user_id: int, values: tuple) -> int:
+async def save_feed_block(data) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('PRAGMA foreign_keys = ON')
+        await db.execute('PRAGMA journal_mode=WAL;')
+        await db.execute('PRAGMA foreign_keys = ON;')
 
-        params = (user_id,) + values
         cursor = await db.execute(
             """
-            INSERT INTO feed_data (user_id, energy, meals, created_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT (user_id, date(created_at)) DO UPDATE SET
+            INSERT INTO feed_data (user_id, energy, protein, fats, carbohydrates, fiber, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?) 
+            ON CONFLICT(user_id, date(created_at)) 
+            DO UPDATE SET
                 energy = energy + excluded.energy,
-                meals  = meals || ', ' || excluded.meals
+                protein = protein + excluded.protein,
+                fats = fats + excluded.fats,
+                carbohydrates = carbohydrates + excluded.carbohydrates,
+                fiber = fiber + excluded.fiber
             """,
-            params,
+            (
+                data['user_id'], data['energy'], data['protein'],
+                data['fats'], data['carbohydrates'], data['fiber'], data['created_at']
+            ),
         )
         await db.commit()
-        logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, user_id)
+        logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, data['user_id'])
         return cursor.lastrowid
