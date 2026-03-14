@@ -4,6 +4,7 @@ from pathlib import Path
 import aiosqlite
 
 from src.config import BASE_DIR, DB_PATH
+from src.storage.db import save_migration_file
 
 
 async def migrate() -> None:
@@ -13,6 +14,9 @@ async def migrate() -> None:
         module = module_from_spec(spec)
         spec.loader.exec_module(module)
 
+        migration_name = module.__file__.rsplit('/', 1)[-1]
+
         async with aiosqlite.connect(DB_PATH) as db:
             await db.executescript(module.ddl)
+            await save_migration_file(migration_name)
             await db.commit()

@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+from src.ai.client import aclient
 from src.bot.conf import settings
 from src.bot import handlers
 from src.storage.runner import migrate
@@ -20,11 +21,17 @@ dp = Dispatcher()
 dp.include_router(handlers.router)  # stub
 
 
+async def on_shutdown(dispatcher: Dispatcher):
+    logger.info('Закрываю соединение с Gemini API...')
+    await aclient.aclose()
+
+
+dp.shutdown.register(on_shutdown)
+
 
 async def main() -> None:
     logger.info('Start migration...')
     await migrate()
-
 
     await dp.start_polling(bot)
 
