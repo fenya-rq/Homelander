@@ -83,7 +83,7 @@ async def get_today_stats(user_id: int) -> FeedDTO | None:
                  SUM(protein),
                  SUM(fats),
                  SUM(carbohydrates),
-                 SUM(fiber),
+                 SUM(fiber)
           FROM feed_data
           WHERE user_id = ?
             AND date(created_at, '+3 hours') = date('now', '+3 hours')
@@ -91,7 +91,7 @@ async def get_today_stats(user_id: int) -> FeedDTO | None:
 
     async with aiosqlite.connect(DB_PATH) as db:
 
-        async with db.execute(sql, (user_id, f"{current_date}%")) as cursor:
+        async with db.execute(sql, (user_id,)) as cursor:
             row = await cursor.fetchone()
 
             if row is None or row[0] is None:
