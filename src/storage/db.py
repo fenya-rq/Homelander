@@ -4,6 +4,7 @@ from datetime import datetime
 import aiosqlite
 
 from src.config import DB_PATH, TZ
+from src.bot.dto import FeedDTO
 
 logger = logging.getLogger(__name__)
 
@@ -53,28 +54,61 @@ async def get_user_id(tg_id: int) -> int:
             return row[0]
 
 
-async def save_feed_block(data) -> int:
+async def save_feed_block(data: FeedDTO) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('PRAGMA journal_mode=WAL;')
         await db.execute('PRAGMA foreign_keys = ON;')
 
-        cursor = await db.execute(
-            """
-            INSERT INTO feed_data (user_id, energy, protein, fats, carbohydrates, fiber, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?) 
-            ON CONFLICT(user_id, date(created_at)) 
-            DO UPDATE SET
-                energy = energy + excluded.energy,
-                protein = protein + excluded.protein,
-                fats = fats + excluded.fats,
-                carbohydrates = carbohydrates + excluded.carbohydrates,
-                fiber = fiber + excluded.fiber
-            """,
-            (
-                data['user_id'], data['energy'], data['protein'],
-                data['fats'], data['carbohydrates'], data['fiber'], data['created_at']
-            ),
+        sql = """
+              INSERT INTO feed_data (user_id, energy, protein, fats, carbohydrates, fiber, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?) 
+              ON CONFLICT(user_id, date(created_at)) 
+              DO UPDATE SET
+                  energy = energy + excluded.energy,
+                  protein = protein + excluded.protein,
+                  fats = fats + excluded.fats,
+                  carbohydrates = carbohydrates + excluded.carbohydrates,
+                  fiber = fiber + excluded.fiber
+              """
+        row_to_save = (
+            data['user_id'], data['energy'], data['protein'],
+            data['fats'], data['carbohydrates'], data['fiber'], data['created_at']
         )
+
+        cursor = await db.execute(sql, row_to_save)
         await db.commit()
         logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, data['user_id'])
         return cursor.lastrowid
+
+
+async def get_today_stats(user_id: int) -> FeedDTO | None:
+    """Получает агрегированную статистику за текущий день."""
+    current_date = datetime.now(tz=TZ).strftime('%Y-%m-%d')
+
+    sql = """
+          SELECT SUM(energy),
+                 SUM(protein),
+                 SUM(fats),
+                 SUM(carbohydrates),
+                 SUM(fiber)
+          FROM feed_data
+          WHERE user_id = ?
+            AND created_at LIKE ?
+          """
+
+    async with aiosqlite.connect(DB_PATH) as db:
+
+        async with db.execute(sql, (user_id, f"{current_date}%")) as cursor:
+            row = await cursor.fetchone()
+
+            if row is None or row[0] is None:
+                return None
+
+            return FeedDTO(
+                energy=row[0],
+                protein=row[1],
+                fats=row[2],
+                carbohydrates=row[3],
+                fiber=row[4],
+                created_at=datetime.now(tz=TZ)
+            )

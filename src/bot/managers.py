@@ -1,58 +1,37 @@
-import json
 import logging
 from datetime import datetime
 
-from pydantic import BaseModel
-
 from src.config import TZ
+from src.shared_tools.constants import AIError
+from src.bot.dto import FeedDTO
 from src.bot.helpers import clean_and_parse_json
-from src.storage.db import save_feed_block
+from src.storage.db import get_today_stats, get_user_id, save_feed_block
 
 logger = logging.getLogger(__name__)
 
 
-class FeedDTO(BaseModel):
-    energy: int
-    protein: int
-    fats: int
-    carbohydrates: int
-    fiber: int
-    user_id: int | None = None
-    created_at: datetime | None = None
-
-    @property
-    def human_text(self) -> str:
-        return (
-            f'📊 **Пищевая ценность:**\n\n'
-            f'🔥 Энергия: `{self.energy}` ккал\n'
-            f'🍗 Белки: `{self.protein}` г\n'
-            f'🥑 Жиры: `{self.fats}` г\n'
-            f'🍞 Углеводы: `{self.carbohydrates}` г\n'
-            f'🌿 Клетчатка: `{self.fiber}` г\n\n'
-            f'🕒 {self.created_at.strftime('%d.%m.%Y %H:%M')}'
-        )
-
-
 class FeedDataManager:
 
-    def __init__(self, data: str) -> None:
-        self.data = data
-        self.json_data: FeedDTO | None = None
+    def _parse_to_dto(self, data: str) -> FeedDTO:
+        json_dict = clean_and_parse_json(data)
+        if not json_dict:
+            raise AIError("Can't parse LLM response as JSON")
 
-    def validate_and_assign_data(self) -> bool:
-        try:
-            if json_data := clean_and_parse_json(self.data):
-                self.json_data = FeedDTO(**json_data)
-                self.json_data.created_at = datetime.now(tz=TZ)
-                return True
-        except Exception as e:
-            logger.error(e)
+        dto = FeedDTO(**json_dict)
+        dto.created_at = datetime.now(tz=TZ)
+        return dto
 
-        return False
+    async def process_and_save(self, user_id: int, raw_data: str) -> FeedDTO:
+        dto = self._parse_to_dto(raw_data)
 
-    async def save_feed_block(self, user_id: int) -> FeedDTO | None:
-        if not self.validate_and_assign_data():
-            return None
-        self.json_data.user_id = user_id
-        await save_feed_block(self.json_data.model_dump())
-        return self.json_data
+        payload = dto.model_dump()
+        payload['user_id'] = user_id
+
+        await save_feed_block(payload)
+        return dto
+
+    async def get_today_stats(self, user_id: int) -> FeedDTO | None:
+        return await get_today_stats(user_id)
+
+
+feed_manager = FeedDataManager()
