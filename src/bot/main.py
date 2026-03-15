@@ -31,6 +31,7 @@ dp.shutdown.register(on_shutdown)
 
 async def main() -> None:
     logger.info('Start migration...')
+    # todo: make manage migrations via cli flag
     await migrate()
 
     await dp.start_polling(bot)
