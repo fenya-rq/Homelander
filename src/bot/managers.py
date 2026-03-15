@@ -12,17 +12,17 @@ logger = logging.getLogger(__name__)
 
 class FeedDataManager:
 
-    def _parse_to_dto(self, data: str) -> FeedDTO:
+    def _parse_to_dto(self, data: str, date_) -> FeedDTO:
         json_dict = clean_and_parse_json(data)
         if not json_dict:
             raise AIError("Can't parse LLM response as JSON")
 
         dto = FeedDTO(**json_dict)
-        dto.created_at = datetime.now(tz=TZ)
+        dto.created_at = date_
         return dto
 
-    async def process_and_save(self, user_id: int, raw_data: str) -> FeedDTO:
-        dto = self._parse_to_dto(raw_data)
+    async def process_and_save(self, user_id: int, raw_data: str, msg_date) -> FeedDTO:
+        dto = self._parse_to_dto(raw_data, msg_date)
 
         payload = dto.model_dump()
         payload['user_id'] = user_id

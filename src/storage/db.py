@@ -62,13 +62,6 @@ async def save_feed_block(data: FeedDTO) -> int:
         sql = """
               INSERT INTO feed_data (user_id, energy, protein, fats, carbohydrates, fiber, created_at)
               VALUES (?, ?, ?, ?, ?, ?, ?) 
-              ON CONFLICT(user_id, date(created_at)) 
-              DO UPDATE SET
-                  energy = energy + excluded.energy,
-                  protein = protein + excluded.protein,
-                  fats = fats + excluded.fats,
-                  carbohydrates = carbohydrates + excluded.carbohydrates,
-                  fiber = fiber + excluded.fiber
               """
         row_to_save = (
             data['user_id'], data['energy'], data['protein'],
@@ -90,10 +83,10 @@ async def get_today_stats(user_id: int) -> FeedDTO | None:
                  SUM(protein),
                  SUM(fats),
                  SUM(carbohydrates),
-                 SUM(fiber)
+                 SUM(fiber),
           FROM feed_data
           WHERE user_id = ?
-            AND created_at LIKE ?
+            AND date(created_at, '+3 hours') = date('now', '+3 hours')
           """
 
     async with aiosqlite.connect(DB_PATH) as db:

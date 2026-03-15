@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel
 
@@ -21,5 +21,5 @@ class FeedDTO(BaseModel):
             f'🥑 Жиры: `{self.fats}` г\n'
             f'🍞 Углеводы: `{self.carbohydrates}` г\n'
             f'🌿 Клетчатка: `{self.fiber}` г\n\n'
-            f'🕒 {self.created_at.strftime('%d.%m.%Y %H:%M')}'
+            f'🕒 {(self.created_at + timedelta(hours=3)).strftime('%d.%m.%Y %H:%M')} по МСК'
         )

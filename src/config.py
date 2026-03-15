@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
-TZ = ZoneInfo('Asia/Bangkok')
+TZ = ZoneInfo('Europe/Moscow')
 
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent

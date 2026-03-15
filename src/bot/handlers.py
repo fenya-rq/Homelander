@@ -59,6 +59,7 @@ async def feed_prompt_handler(message: Message):
 
     Therefore, we need to place it to end of handlers order.
     """
+    msg_date = message.date
     user_id = await get_user_id(message.from_user.id)
 
     try:
@@ -67,7 +68,7 @@ async def feed_prompt_handler(message: Message):
             return await message.answer(f'Внутренняя ошибка AI агента, попробуйте еще раз.')
 
         try:
-            saved_dto: FeedDTO = await feed_manager.process_and_save(user_id, llm_response)
+            saved_dto: FeedDTO = await feed_manager.process_and_save(user_id, llm_response, msg_date)
             return await message.answer(f'{saved_dto.human_text}', parse_mode='Markdown')
 
         except BaseDomainError as e:
