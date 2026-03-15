@@ -5,10 +5,6 @@ from datetime import datetime
 from src.config import TZ
 
 
-class ParserError(Exception):
-    pass
-
-
 # todo: refactor to handle dates
 # async def parse_data(user_data: str, msg_date: datetime):
 #     lines = [line.strip() for line in user_data.strip().split('\n')]

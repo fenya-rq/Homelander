@@ -6,15 +6,18 @@ from google.genai.errors import ClientError
 
 from src.config import GEMINI_API_KEY
 
-FREE_TIER_MODELS = (
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash-preview-tts',
+# Those models can't take system rules ,need to pass it with each request
+GEMMA_MODELS = (
     'gemma-3-27b-it',
     'gemma-3-12b-it',
 )
 
-
+FREE_TIER_MODELS = (
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash-preview-tts',
+    'gemini-3.1-flash-lite-preview',
+)
 
 SYSTEM_INSTRUCTION = (
     "Role: Expert Nutritionist & Food Data Analyst (2025-2026).\n"

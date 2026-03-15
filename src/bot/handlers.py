@@ -5,19 +5,13 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from src.ai.client import get_response
-from src.bot.managers import FeedDataManager, FeedDTO
+from src.bot.managers import FeedDTO, feed_manager
+from src.shared_tools.constants import BaseDomainError
 from src.storage.db import get_or_create_user, get_user_id
 
 logger = logging.getLogger(__name__)
 
 router = Router()
-
-
-@router.message(Command('createuser'))
-async def cmd_create_user(message: Message) -> None:
-    user_id, username = message.from_user.id, message.from_user.username
-    await get_or_create_user(user_id, username)
-    await message.answer(f'User {username} has created!')
 
 
 @router.message(Command('help'))
@@ -37,28 +31,53 @@ async def cmd_start(message: Message) -> None:
     )
 
 
-@router.message(Command('day'))
-async def day_report(message: Message) -> None:
-    await message.answer('stub for /day')
+@router.message(Command('createuser'))
+async def cmd_create_user(message: Message) -> None:
+    user_id, username = message.from_user.id, message.from_user.username
+    await get_or_create_user(user_id, username)
+    await message.answer(f'User {username} has created!')
 
 
-@router.message(Command('yesterday'))
-async def yesterday_report(message: Message) -> None:
-    await message.answer('stub for /day')
+@router.message(Command('daystats'))
+async def get_stats(message: Message):
+    user_id = await get_user_id(message.from_user.id)
+
+    stats = await feed_manager.get_today_stats(user_id)
+
+    if stats is None:
+        return await message.answer('За сегодня записей еще нет. Пора что-нибудь съесть! 🍽')
+
+    return await message.answer(
+        f'📅 **Статистика за сегодня:**\n\n{stats.human_text}',
+        parse_mode='Markdown'
+    )
 
 
 @router.message()
-async def func_test(message: Message):
-    llm_response = await get_response(message.text)
-    if llm_response is None:
-        await message.answer(f'Внутренняя ошибка AI агента, попробуйте еще раз.')
+async def feed_prompt_handler(message: Message):
+    """This is a greedy handler - he catches all any text messages.
 
+    Therefore, we need to place it to end of handlers order.
+    """
     user_id = await get_user_id(message.from_user.id)
-    feed_manager = FeedDataManager(llm_response)
 
-    saved_dto: FeedDTO = await feed_manager.save_feed_block(user_id)
-    # todo: refactor Manager class to singleton and after this handler
-    if not saved_dto:
-        await message.answer(f'Ответ не был записан в БД, попробуйте еще раз!\n{llm_response}')
+    try:
+        llm_response = await get_response(message.text)
+        if llm_response is None:
+            return await message.answer(f'Внутренняя ошибка AI агента, попробуйте еще раз.')
 
-    await message.answer(f'{saved_dto.human_text}', parse_mode='Markdown')
+        try:
+            saved_dto: FeedDTO = await feed_manager.process_and_save(user_id, llm_response)
+            return await message.answer(f'{saved_dto.human_text}', parse_mode='Markdown')
+
+        except BaseDomainError as e:
+            logger.error(e)
+            return await message.answer(f'Уточнение от агента:\n{llm_response}')
+
+        except Exception as e:
+            logger.exception('Unexpected error for user %s', user_id)
+            return await message.answer('Произошла системная ошибка при сохранении данных.')
+
+    except Exception as e:
+        logger.error('AI Client error for user %s, error:\n%s', (user_id, e))
+        return await message.answer('Произошла системная ошибка при сохранении данных.')
