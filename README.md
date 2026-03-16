@@ -26,17 +26,16 @@ coming soon
 
 ## 📝 Roadmap: План развития
 
-### 1. Еженедельная статистика (`/weekstats`)
-* **Метод в менеджере:** Агрегация `SUM` с группировкой по дням за последние 7 суток.
-* **Визуализация:** Генерация простого графика (КБЖУ по дням) через `matplotlib` или `ploty`.
-* **Вывод:** Отправка изображения графиком + краткий текстовый итог.
+---
+> todo: create **changelog.md** !
+---
 
-### 2. Docker & Deployment
+### 1. Docker & Deployment
 * **Dockerfile:** Образ на базе `python:3.14-slim`.
 * **Compose:** Описать контейнер бота и `volume` для сохранности `nutrition.db`.
 * **Environment:** Вынос всех настроек (`TZ`, `DB_PATH`, `API_KEYS`) в `.env`.
 
-### 3. Computer Vision (Photo-to-Kcal)
+### 2. Computer Vision (Photo-to-Kcal)
 * **Multi-modal:** Хендлер на `F.photo` для приема изображений.
 * **Gemini Vision:** Отправка байтов фото в Gemini с промптом на распознавание состава и веса.
 * **Flow:** Распознавание -> Подтверждение пользователем -> Запись в ленту.

@@ -76,8 +76,6 @@ async def save_feed_block(data: FeedDTO) -> int:
 
 async def get_today_stats(user_id: int) -> FeedDTO | None:
     """Получает агрегированную статистику за текущий день."""
-    current_date = datetime.now(tz=TZ).strftime('%Y-%m-%d')
-
     sql = """
           SELECT 
               SUM(energy),
