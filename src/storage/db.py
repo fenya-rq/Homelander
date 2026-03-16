@@ -79,11 +79,12 @@ async def get_today_stats(user_id: int) -> FeedDTO | None:
     current_date = datetime.now(tz=TZ).strftime('%Y-%m-%d')
 
     sql = """
-          SELECT SUM(energy),
-                 SUM(protein),
-                 SUM(fats),
-                 SUM(carbohydrates),
-                 SUM(fiber)
+          SELECT 
+              SUM(energy),
+              SUM(protein),
+              SUM(fats),
+              SUM(carbohydrates),
+              SUM(fiber)
           FROM feed_data
           WHERE user_id = ?
             AND date(created_at, '+3 hours') = date('now', '+3 hours')
@@ -105,3 +106,31 @@ async def get_today_stats(user_id: int) -> FeedDTO | None:
                 fiber=row[4],
                 created_at=datetime.now(tz=TZ)
             )
+
+
+async def get_weekly_stats(user_id: int) -> list[FeedDTO]:
+    sql = """
+          SELECT 
+              SUM(energy),
+              SUM(protein),
+              SUM(fats),
+              SUM(carbohydrates),
+              SUM(fiber),
+              DATE(created_at, '+3 hours') as day
+          FROM feed_data
+          WHERE user_id = ?
+            AND DATE(created_at, '+3 hours') >= DATE('now', '+3 hours', '-6 days')
+          GROUP BY day
+          ORDER BY day ASC
+          """
+    async with aiosqlite.connect(DB_PATH) as db:
+
+        async with db.execute(sql, (user_id,)) as cursor:
+            rows = await cursor.fetchall()
+            if not rows:
+                return []
+
+            return [
+                FeedDTO(energy=row[0], protein=row[1], fats=row[2], carbohydrates=row[3], fiber=row[4], created_at=row[5])
+                for row in rows
+            ]
