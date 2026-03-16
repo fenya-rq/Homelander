@@ -39,18 +39,19 @@ async def cmd_create_user(message: Message) -> None:
 
 
 @router.message(Command('daystats'))
-async def get_stats(message: Message):
+async def get_day_stats(message: Message):
     user_id = await get_user_id(message.from_user.id)
-
     stats = await feed_manager.get_today_stats(user_id)
-
     if stats is None:
         return await message.answer('За сегодня записей еще нет. Пора что-нибудь съесть! 🍽')
+    return await message.answer(f'📅 **Статистика за сегодня:**\n\n{stats.human_text}', parse_mode='Markdown')
 
-    return await message.answer(
-        f'📅 **Статистика за сегодня:**\n\n{stats.human_text}',
-        parse_mode='Markdown'
-    )
+
+@router.message(Command('weekstats'))
+async def get_week_stats(message: Message):
+    user_id = await get_user_id(message.from_user.id)
+    stats_chart = await feed_manager.get_weekly_stats(user_id)
+    await message.answer_photo(photo=stats_chart, caption='📊 Твой прогресс питания за неделю')
 
 
 @router.message()
