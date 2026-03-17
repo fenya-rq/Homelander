@@ -73,41 +73,76 @@ async def save_feed_block(data: FeedDTO) -> int:
         logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, data['user_id'])
         return cursor.lastrowid
 
+#
+# async def get_today_stats(user_id: int) -> FeedDTO | None:
+#     """Получает агрегированную статистику за текущий день."""
+#     sql = """
+#           SELECT
+#               SUM(energy),
+#               SUM(protein),
+#               SUM(fats),
+#               SUM(carbohydrates),
+#               SUM(fiber)
+#           FROM feed_data
+#           WHERE user_id = ?
+#             AND date(created_at, '+3 hours') = date('now', '+3 hours')
+#           """
+#
+#     async with aiosqlite.connect(DB_PATH) as db:
+#
+#         async with db.execute(sql, (user_id,)) as cursor:
+#             row = await cursor.fetchone()
+#
+#             if row is None or row[0] is None:
+#                 return None
+#
+#             return FeedDTO(
+#                 energy=row[0],
+#                 protein=row[1],
+#                 fats=row[2],
+#                 carbohydrates=row[3],
+#                 fiber=row[4],
+#                 created_at=datetime.now(tz=TZ)
+#             )
+#
+#
+# async def get_weekly_stats(user_id: int) -> list[FeedDTO]:
+#     sql = """
+#           SELECT
+#               SUM(energy),
+#               SUM(protein),
+#               SUM(fats),
+#               SUM(carbohydrates),
+#               SUM(fiber),
+#               DATE(created_at, '+3 hours') as day
+#           FROM feed_data
+#           WHERE user_id = ?
+#             AND DATE(created_at, '+3 hours') >= DATE('now', '+3 hours', '-6 days')
+#           GROUP BY day
+#           ORDER BY day ASC
+#           """
+#     async with aiosqlite.connect(DB_PATH) as db:
+#
+#         async with db.execute(sql, (user_id,)) as cursor:
+#             rows = await cursor.fetchall()
+#             if not rows:
+#                 return []
+#
+#             return [
+#                 FeedDTO(energy=row[0], protein=row[1], fats=row[2], carbohydrates=row[3], fiber=row[4], created_at=row[5])
+#                 for row in rows
+#             ]
 
-async def get_today_stats(user_id: int) -> FeedDTO | None:
-    """Получает агрегированную статистику за текущий день."""
-    sql = """
-          SELECT 
-              SUM(energy),
-              SUM(protein),
-              SUM(fats),
-              SUM(carbohydrates),
-              SUM(fiber)
-          FROM feed_data
-          WHERE user_id = ?
-            AND date(created_at, '+3 hours') = date('now', '+3 hours')
-          """
 
-    async with aiosqlite.connect(DB_PATH) as db:
+async def get_nutrition_stats(user_id: int, days: int = 0) -> list[FeedDTO]:
+    """Получает агрегированную статистику за указанный период."""
 
-        async with db.execute(sql, (user_id,)) as cursor:
-            row = await cursor.fetchone()
+    # Если days=0, берем только сегодня, если > 0, то интервал
+    date_filter = "date('now', '+3 hours')"
+    if days > 0:
+        date_filter = f"date('now', '+3 hours', '-{days} days')"
 
-            if row is None or row[0] is None:
-                return None
-
-            return FeedDTO(
-                energy=row[0],
-                protein=row[1],
-                fats=row[2],
-                carbohydrates=row[3],
-                fiber=row[4],
-                created_at=datetime.now(tz=TZ)
-            )
-
-
-async def get_weekly_stats(user_id: int) -> list[FeedDTO]:
-    sql = """
+    sql = f"""
           SELECT 
               SUM(energy),
               SUM(protein),
@@ -117,18 +152,24 @@ async def get_weekly_stats(user_id: int) -> list[FeedDTO]:
               DATE(created_at, '+3 hours') as day
           FROM feed_data
           WHERE user_id = ?
-            AND DATE(created_at, '+3 hours') >= DATE('now', '+3 hours', '-6 days')
+            AND DATE(created_at, '+3 hours') >= {date_filter}
           GROUP BY day
           ORDER BY day ASC
           """
+
     async with aiosqlite.connect(DB_PATH) as db:
 
         async with db.execute(sql, (user_id,)) as cursor:
             rows = await cursor.fetchall()
-            if not rows:
-                return []
 
             return [
-                FeedDTO(energy=row[0], protein=row[1], fats=row[2], carbohydrates=row[3], fiber=row[4], created_at=row[5])
-                for row in rows
+                FeedDTO(
+                    energy=row[0],
+                    protein=row[1],
+                    fats=row[2],
+                    carbohydrates=row[3],
+                    fiber=row[4],
+                    created_at=datetime.strptime(row[5], '%Y-%m-%d') if days else datetime.now(tz=TZ)
+                )
+                for row in rows if row[0] is not None
             ]
