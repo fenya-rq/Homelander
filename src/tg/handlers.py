@@ -1,11 +1,11 @@
 import logging
 
-from aiogram import Router
+from aiogram import Bot, Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from src.ai.client import get_response
-from src.bot.managers import FeedDTO, feed_manager
+from src.ai.client import elevenlabs_client, get_response
+from src.tg.managers import FeedDTO, feed_manager
 from src.shared_tools.constants import BaseDomainError
 from src.storage.db import get_or_create_user, get_user_id
 
@@ -52,6 +52,16 @@ async def get_week_stats(message: Message):
     user_id = await get_user_id(message.from_user.id)
     stats_chart = await feed_manager.get_weekly_stats(user_id)
     await message.answer_photo(photo=stats_chart, caption='📊 Твой прогресс питания за неделю')
+
+
+# TODO: finish the handler
+@router.message(F.voice)
+async def voice(message: Message, bot: Bot):
+    file = await bot.get_file(message.voice.file_id)
+    downloaded = await bot.download_file(file.file_path)
+    text = await elevenlabs_client.speech_to_text(downloaded.read())
+    print(f'result: {text}')
+    print(f'result type: {type(text)}')
 
 
 @router.message()

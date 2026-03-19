@@ -16,6 +16,8 @@ DB_PATH = BASE_DIR / os.getenv('DB_PATH')
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+ELEVEN_LABS_API_KEY = os.getenv('ELEVEN_LABS_API_KEY')
+
 # ------------------------------------ Logging ------------------------------------
 LOGGING = {
     "version": 1,
