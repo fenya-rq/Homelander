@@ -4,7 +4,7 @@ from datetime import datetime
 import aiosqlite
 
 from src.config import DB_PATH, TZ
-from src.bot.dto import FeedDTO
+from src.tg.dto import FeedDTO
 
 logger = logging.getLogger(__name__)
 

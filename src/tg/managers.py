@@ -3,8 +3,8 @@ import logging
 from aiogram.types import BufferedInputFile
 
 from src.shared_tools.constants import AIError
-from src.bot.dto import FeedDTO
-from src.bot.helpers import clean_and_parse_json, generate_weekly_chart
+from src.tg.dto import FeedDTO
+from src.tg.helpers import clean_and_parse_json, generate_weekly_chart
 from src.storage.db import get_nutrition_stats, save_feed_block
 
 logger = logging.getLogger(__name__)

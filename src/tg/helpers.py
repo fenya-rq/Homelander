@@ -5,7 +5,7 @@ import re
 import matplotlib.pyplot as plt
 from aiogram.types import BufferedInputFile
 
-from src.bot.dto import FeedDTO
+from src.tg.dto import FeedDTO
 
 
 def _extract_balanced_json(text: str) -> str | None:
