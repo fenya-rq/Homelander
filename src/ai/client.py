@@ -1,10 +1,11 @@
 import logging
 from itertools import cycle
 
+from elevenlabs.client import AsyncElevenLabs
 from google.genai import Client, types
 from google.genai.errors import ClientError
 
-from src.config import GEMINI_API_KEY
+from src.config import ELEVEN_LABS_API_KEY, GEMINI_API_KEY
 
 # Those models can't take system rules ,need to pass it with each request
 GEMMA_MODELS = (
@@ -51,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 model_pool = cycle(FREE_TIER_MODELS)
 
-aclient = Client(api_key=GEMINI_API_KEY).aio
+gemini_client = Client(api_key=GEMINI_API_KEY).aio
 
 config = types.GenerateContentConfig(
     system_instruction=SYSTEM_INSTRUCTION,
@@ -66,7 +67,7 @@ async def get_response(prompt: str, max_retries: int = 3):
     while True:
         try:
 
-            response = await aclient.models.generate_content(
+            response = await gemini_client.models.generate_content(
                 model=current_model,
                 contents=prompt,
                 config=config
@@ -87,3 +88,19 @@ async def get_response(prompt: str, max_retries: int = 3):
                 continue
             else:
                 raise e
+
+
+class ElevenLabsClient:
+
+    def __init__(self):
+        self.client = AsyncElevenLabs(api_key=ELEVEN_LABS_API_KEY)
+
+    async def speech_to_text(self, audio: bytes):
+        return await self.client.speech_to_text.convert(
+            model_id='scribe_v2',
+            file=audio,
+            language_code='ru',
+        )
+
+
+elevenlabs_client = ElevenLabsClient()
