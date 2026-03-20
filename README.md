@@ -27,7 +27,7 @@ coming soon
 ## 📝 Roadmap: План развития
 
 ---
-> todo: create **changelog.md** !
+> todo: set up **logging** to monitoring all used LLM tokens!
 ---
 
 ### 1. Docker & Deployment
