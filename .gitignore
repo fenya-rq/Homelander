@@ -220,3 +220,4 @@ tree.md
 **.db
 **.db-shm
 **.db-wal
+local.docker-compose.yml

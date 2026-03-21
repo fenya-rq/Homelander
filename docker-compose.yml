@@ -1,0 +1,12 @@
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: hl-backend
+    env_file:
+      - .env
+    command: ${START_BOT_CMD}
+    volumes:
+      - ./src:/app/src
