@@ -33,13 +33,11 @@ coming soon
 ---
 ## 📝 Roadmap: План развития
 
-#### 1. Extended logging
+#### 1. Tests
 
-#### 2. Tests
+#### 2. CI/CD
 
-#### 3. CI/CD
-
-#### 4. Computer Vision (Photo-to-Kcal)
+#### 3. Computer Vision (Photo-to-Kcal)
 * **Multi-modal:** Хендлер на `F.photo` для приема изображений.
 * **Gemini Vision:** Отправка байтов фото в Gemini с промптом на распознавание состава и веса.
 * **Flow:** Распознавание -> Подтверждение пользователем -> Запись в ленту.
