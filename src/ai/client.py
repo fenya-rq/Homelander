@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Callable
 from copy import deepcopy
 from functools import wraps
 from itertools import cycle
@@ -56,23 +57,27 @@ class GeminiClient:
 
     def __init__(self, model, alt_models, config, rpd_threshold=5):
         self.client = Client(api_key=GEMINI_API_KEY).aio
+        self.main_model = model
         self.current_model = model
-        self.max_switches = len(alt_models)
-        self.alt_models = alt_models
+        self.alt_models = list(alt_models)
         self.config = config if config else deepcopy(default_gemini_config)
-        self._alt_models = cycle((model,) + alt_models)
-        self._on_low_limit = Coroutine | None
+        self._models_iter = iter(self.alt_models)
+        self._on_low_limit = Callable | None
 
     def set_low_limit_handler(self, handler):
         """Регистрирует внешний обработчик для низких лимитов."""
         self._on_low_limit = handler
+
+    def reset_models_iterator(self):
+        self._models_iter = iter(self.alt_models)
+        self.current_model = self.main_model
+        logger.info('Iterator reset to main model: %s', self.main_model)
 
     @staticmethod
     def model_switcher(func):
         @wraps(func)
         async def wrapper(self, *args, **kwargs):
             other_errors_attempt = 0
-            alt_model_attempt = 0
 
             while True:
 
@@ -80,22 +85,20 @@ class GeminiClient:
                     return await func(self, *args, **kwargs)
                 except ClientError as e:
                     if e.code == 429:
-
-                        if alt_model_attempt >= self.max_switches:
-                            logger.error('All Gemini models limits have been exhausted.')
-
-                            await self._on_low_limit()
-                            return None
-
                         logger.warning('Limit exhausted for %s', self.current_model)
 
-                        alt_model_attempt += 1
-                        self.current_model = next(self._alt_models)
+                        try:
+                            self.current_model = next(self._models_iter)
+                            logger.info('Switched to %s', self.current_model)
+                            await asyncio.sleep(1)
+                            continue
 
-                        logger.info('Switched to %s', self.current_model)
+                        except StopIteration:
+                            logger.error('All models limits have been exhausted.')
 
-                        await asyncio.sleep(1)
-                        continue
+                            await self._on_low_limit()
+                            self.reset_models_iterator()
+                            return None
 
                     else:
                         if other_errors_attempt >= 2:
@@ -104,7 +107,7 @@ class GeminiClient:
 
                         other_errors_attempt += 1
                         wait = (other_errors_attempt + 1) * 2
-                        logger.info('Error: %s\nRetrying in %s seconds...', e, wait)
+                        logger.info('%s\nRetrying in %s seconds...',e, wait)
                         await asyncio.sleep(wait)
 
         return wrapper
