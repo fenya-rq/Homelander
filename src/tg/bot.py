@@ -28,12 +28,13 @@ async def on_start(dispatcher: Dispatcher):
     await migrate()
 
 
-async def on_shutdown(dispatcher: Dispatcher):
-    logger.info('Закрываю соединение с Gemini API...')
-    await gemini_client.aclose()
+# todo: find correct way to close Gemini client connection, since it uses aiohttp under the hood, we can just close the session, but we need to add this method to our GeminiClient class first.
+# async def on_shutdown(dispatcher: Dispatcher):
+#     logger.info('Закрываю соединение с Gemini API...')
+#     await gemini_client.aclose()
 
 
-# TODO: test it before commit
+# todo: test it before commit
 async def notify_admin_about_11labs_limits(remains):
     await bot.send_message(BOT_ADMIN_ID, f'⚠️ Внимание! Лимиты ElevenLabs на исходе: {remains} симв.')
 
@@ -48,4 +49,4 @@ async def notify_admin_about_google_limits():
 gemini_client.set_low_limit_handler(notify_admin_about_google_limits)
 
 dp.startup.register(on_start)
-dp.shutdown.register(on_shutdown)
+# dp.shutdown.register(on_shutdown)
