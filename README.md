@@ -27,6 +27,14 @@
 * **Architecture:** `Stateless Manager` (синглтон) для безопасной работы в `asyncio` среде.
 ---
 
+## Используемые LLM
+    Gemini:
+    - MAIN_LLM = 'gemini-2.5-flash'
+    - ALT_LLM = 'gemini-2.5-flash-lite'
+    ElevenLabs:
+    - MAIN_LLM = 'scribe_v2'
+---
+
 ## 🚀 Быстрый старт
 coming soon
 

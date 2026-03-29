@@ -4,7 +4,7 @@ from aiogram import Bot, Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from src.ai.client import elevenlabs_client, get_response
+from src.ai.client import ALT_LLM, MAIN_LLM, ElevenLabsClient, GeminiClient, nutritionist_gemini_config
 from src.tg.managers import FeedDTO, feed_manager
 from src.shared_tools.constants import BaseDomainError
 from src.storage.db import get_or_create_user, get_user_id
@@ -12,6 +12,10 @@ from src.storage.db import get_or_create_user, get_user_id
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+elevenlabs_client = ElevenLabsClient()
+
+gemini_client = GeminiClient(MAIN_LLM, (ALT_LLM,), nutritionist_gemini_config)
 
 
 @router.message(Command('help'))
@@ -61,7 +65,7 @@ async def process_text_logic(message: Message, text: str):
     err_msg = 'Произошла системная ошибка при сохранении данных.'
 
     try:
-        llm_response = await get_response(text)
+        llm_response = await gemini_client.get_response(text)
         if llm_response is None:
             return await message.answer('Внутренняя ошибка AI агента, попробуйте еще раз.')
 

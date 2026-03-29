@@ -12,11 +12,15 @@ ROOT_DIR = BASE_DIR.parent
 
 load_dotenv(ROOT_DIR / '.env')
 
+LOG_DIR = ROOT_DIR / 'logs'
+
+BOT_ADMIN_ID = os.getenv('BOT_ADMIN_ID')
+
 DB_PATH = BASE_DIR / os.getenv('DB_PATH')
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-ELEVEN_LABS_API_KEY = os.getenv('ELEVEN_LABS_API_KEY')
+ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 
 # ------------------------------------ Logging ------------------------------------
 LOGGING = {
@@ -36,7 +40,7 @@ LOGGING = {
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 3,
             'formatter': 'standard',
-            'filename': ROOT_DIR / 'info.log',
+            'filename': LOG_DIR / 'info.log',
             'encoding': 'utf-8',
         },
         # 2. Хэндлер СТРОГО для ошибок
@@ -46,7 +50,7 @@ LOGGING = {
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 3,
             'formatter': 'standard',
-            'filename': ROOT_DIR / 'errors.log',
+            'filename': LOG_DIR / 'errors.log',
             'encoding': 'utf-8',
         },
         # 3. Консоль для удобства разработки
