@@ -24,7 +24,7 @@ dp.include_router(handlers.router)  # stub
 async def on_start(dispatcher: Dispatcher):
     logger.info('Bot started!')
     # todo: make manage migrations via cli flag
-    logger.info('Start migration...')
+    logger.debug('Start migration...')
     await migrate()
 
 
