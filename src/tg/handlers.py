@@ -121,9 +121,7 @@ async def process_text_logic(message: Message, text: str, override_date=None):
 
         try:
             saved_dto: FeedDTO = await feed_manager.process_and_save(user_id, llm_response, msg_date)
-            # todo: remove if parse mode will not be needed
-            # return await message.answer(f'{saved_dto.human_text}', parse_mode='Markdown')
-            return await message.answer(f'{saved_dto.human_text}')
+            return await message.answer(f'{saved_dto.human_text}', parse_mode='Markdown')
 
         except BaseDomainError as e:
             logger.error(e)
