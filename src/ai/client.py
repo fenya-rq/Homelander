@@ -10,6 +10,9 @@ from google.genai import Client, types
 from google.genai.errors import ClientError
 
 from src.config import ELEVENLABS_API_KEY, GEMINI_API_KEY
+from src.shared_tools.constants import AIError
+from src.tg.dto import FeedResponse
+from src.tg.helpers import clean_and_parse_json
 
 MAIN_LLM = 'gemini-2.5-flash'
 ALT_LLM = 'gemini-2.5-flash-lite'
@@ -121,6 +124,27 @@ class GeminiClient:
             config=self.config
         )
         return response.text
+
+    async def parse_to_dto(self, data: str, date_) -> FeedResponse:
+        """Преобразует текстовый ответ LLM в валидированный объект DTO.
+
+        Args:
+            data: JSON-строка или текст с разметкой от модели.
+            date_: Дата и время создания записи.
+
+        Returns:
+            Объект FeedDTO с установленной датой.
+
+        Raises:
+            AIError: Если не удалось извлечь или распарсить JSON.
+        """
+        json_dict = clean_and_parse_json(data)
+        if not json_dict:
+            raise AIError("Can't parse LLM response as JSON")
+
+        dto = FeedResponse(**json_dict)
+        dto.created_at = date_
+        return dto
 
 
 class ElevenLabsClient:

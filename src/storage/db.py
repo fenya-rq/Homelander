@@ -1,114 +1,93 @@
 import logging
+from asyncio import Queue
 from datetime import datetime
 
 import aiosqlite
 
-from src.config import DB_PATH, TZ
-from src.tg.dto import FeedDTO, NutritionStatsRequest
+from src.config import DB_PATH
 
 logger = logging.getLogger(__name__)
 
 
+class AioSqlitePool:
+    def __init__(self, db_path: str, max_connections: int = 5):
+        self.db_path = db_path
+        self.max_connections = max_connections
+        self._pool: Queue[aiosqlite.Connection] = Queue()
+
+    async def init(self) -> None:
+        """Заполняем пул настроенными соединениями."""
+        for _ in range(self.max_connections):
+            conn = await aiosqlite.connect(self.db_path)
+            conn.row_factory = aiosqlite.Row
+
+            # Настраиваем один раз при старте приложения
+            await conn.execute('PRAGMA journal_mode = WAL')
+            await conn.execute('PRAGMA synchronous = NORMAL')
+            await conn.execute('PRAGMA cache_size = 10000')
+            await conn.execute('PRAGMA temp_store = MEMORY')
+            await conn.execute('PRAGMA foreign_keys = ON')
+            await conn.execute('PRAGMA mmap_size = 268435456')
+
+            self._pool.put_nowait(conn)
+
+    def acquire(self):
+        """Контекстный менеджер для взятия коннекта из пула."""
+        return _ConnectionContextManager(self._pool)
+
+    async def close(self) -> None:
+        """Закрываем все соединения при остановке бота."""
+        while not self._pool.empty():
+            conn = await self._pool.get()
+            await conn.close()
+
+
+class _ConnectionContextManager:
+    def __init__(self, pool_queue: Queue):
+        self.pool_queue = pool_queue
+        self.conn = None
+
+    async def __aenter__(self) -> aiosqlite.Connection:
+        self.conn = await self.pool_queue.get()
+        return self.conn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self.conn:
+            self.pool_queue.put_nowait(self.conn)
+
+
+async def get_session_pool(db_path: str = DB_PATH) -> AioSqlitePool:
+    """Фабрика для создания и инициализации пула соединений."""
+    pool = AioSqlitePool(db_path, max_connections=10)
+    await pool.init()  # Здесь один раз выполняются все PRAGMA для каждого соединения
+    return pool
+
+# async def get_connection(db_path: str = DB_PATH) -> aiosqlite.Connection:
+#     conn = await aiosqlite.connect(db_path)
+#     conn.row_factory = aiosqlite.Row
+#
+#     await conn.execute("PRAGMA journal_mode = WAL")
+#     await conn.execute("PRAGMA synchronous = NORMAL")
+#     await conn.execute("PRAGMA cache_size = 10000")
+#     await conn.execute("PRAGMA temp_store = MEMORY")
+#     await conn.execute("PRAGMA foreign_keys = ON")
+#     await conn.execute("PRAGMA mmap_size = 268435456")
+#
+#     return conn
+#
+
+# todo: refactor this module, take out sql queries to separate managers (like FeedDataManager) and make this module responsible only for low-level db operations
+#  (like connection management, transactions, etc.). Also, we can use connection pool for better performance, since aiosqlite supports it via aiosqlite.Pool.
 async def save_migration_file(name: str) -> None:
     """Сохраняет информацию о выполненной миграции в базу данных."""
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('PRAGMA journal_mode=WAL;')
         await db.execute('PRAGMA foreign_keys = ON')
 
-        current_ts = datetime.now(tz=TZ)
+        current_ts = datetime.now()
         await db.execute(
             'INSERT OR IGNORE INTO migrations (filename, applied_at) VALUES (?, ?)',
             (name, current_ts),
         )
         await db.commit()
         logger.debug('Saved migration %s at %s', name, current_ts)
-
-
-async def get_or_create_user(tg_id: int, username: str | None) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('PRAGMA journal_mode=WAL;')
-        await db.execute('PRAGMA foreign_keys = ON')
-
-        current_ts = datetime.now(tz=TZ)
-        async with db.execute(
-            """
-            INSERT INTO users (tg_id, username, created_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT (tg_id) DO UPDATE SET username = excluded.username
-            RETURNING id
-            """,
-            (tg_id, username, current_ts),
-        ) as cursor:
-            row = await cursor.fetchone()
-            await db.commit()
-            return row[0]
-
-
-async def get_user_id(tg_id: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('PRAGMA foreign_keys = ON')
-        async with db.execute(
-            'SELECT id FROM users WHERE tg_id = ?', (tg_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            return row[0]
-
-
-async def save_feed_block(data: FeedDTO) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('PRAGMA journal_mode=WAL;')
-        await db.execute('PRAGMA foreign_keys = ON;')
-
-        sql = """
-              INSERT INTO feed_data (user_id, energy, protein, fats, carbohydrates, fiber, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?) 
-              """
-        row_to_save = (
-            data['user_id'], data['energy'], data['protein'],
-            data['fats'], data['carbohydrates'], data['fiber'], data['created_at']
-        )
-
-        cursor = await db.execute(sql, row_to_save)
-        await db.commit()
-        logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, data['user_id'])
-        return cursor.lastrowid
-
-
-async def get_nutrition_stats(stat_req: NutritionStatsRequest) -> list[FeedDTO]:
-    """Получает агрегированную статистику за указанный период."""
-    # Если days=0, берем только сегодня, если > 0, то интервал
-    date_filter = f"'now', '{stat_req.tz_slip}'"
-    if stat_req.days > 0:
-        date_filter = f"{date_filter}, '-{stat_req.days} days'"
-
-    sql = f"""
-          SELECT 
-              SUM(energy),
-              SUM(protein),
-              SUM(fats),
-              SUM(carbohydrates),
-              SUM(fiber),
-              DATE(created_at, '{stat_req.tz_slip}') as day
-          FROM feed_data
-          WHERE user_id = ?
-            AND DATE(created_at, '{stat_req.tz_slip}') >= DATE({date_filter})
-          GROUP BY day
-          ORDER BY day ASC
-          """
-
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        async with db.execute(sql, (stat_req.user_id,)) as cursor:
-            rows = await cursor.fetchall()
-
-            return [
-                FeedDTO(
-                    energy=row[0],
-                    protein=row[1],
-                    fats=row[2],
-                    carbohydrates=row[3],
-                    fiber=row[4],
-                    created_at=datetime.strptime(row[5], '%Y-%m-%d') if stat_req.days else datetime.now(stat_req.zone_info).date()
-                )
-                for row in rows if row[0] is not None
-            ]
