@@ -59,7 +59,7 @@ class FeedRepository(BaseRepository):
 
         async with self.session.execute(sql, params) as cursor:
             await self.session.commit()
-            logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, data['user_id'])
+            logger.debug('Saved record id=%s for user_id=%s', cursor.lastrowid, data.user_id)
             return cursor.lastrowid
 
 

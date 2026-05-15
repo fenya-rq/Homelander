@@ -48,7 +48,7 @@ class FeedBase(ConfiguredBaseModel):
 
 
 class FeedNutrients(FeedBase):
-    created_at: str
+    created_at: datetime
 
 
 class FeedRequest(FeedNutrients):
@@ -59,7 +59,7 @@ class FeedResponse(FeedNutrients):
 
     @property
     def human_text(self) -> str:
-        date_str = datetime.strptime(self.created_at, '%Y-%m-%d').strftime('%d.%m.%Y')
+        date_str = datetime.strftime(self.created_at, '%Y-%m-%d')
         return (
             f'📊 **Пищевая ценность:**\n\n'
             f'🔥 Энергия: `{self.energy}` ккал\n'

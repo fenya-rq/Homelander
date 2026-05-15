@@ -142,9 +142,7 @@ class GeminiClient:
         if not json_dict:
             raise AIError("Can't parse LLM response as JSON")
 
-        dto = FeedResponse(**json_dict)
-        dto.created_at = date_
-        return dto
+        return FeedResponse(**json_dict, created_at=date_)
 
 
 class ElevenLabsClient:
