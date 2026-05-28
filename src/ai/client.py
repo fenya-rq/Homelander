@@ -1,26 +1,23 @@
+import asyncio
 import logging
-from itertools import cycle
+from collections.abc import Callable
+from copy import deepcopy
+from functools import wraps
+from typing import Coroutine
 
 from elevenlabs.client import AsyncElevenLabs
 from google.genai import Client, types
 from google.genai.errors import ClientError
 
-from src.config import ELEVEN_LABS_API_KEY, GEMINI_API_KEY
+from src.config import ELEVENLABS_API_KEY, GEMINI_API_KEY
+from src.shared_tools.constants import AIError
+from src.tg.dto import FeedResponse
+from src.tg.helpers import clean_and_parse_json
 
-# Those models can't take system rules ,need to pass it with each request
-GEMMA_MODELS = (
-    'gemma-3-27b-it',
-    'gemma-3-12b-it',
-)
+MAIN_LLM = 'gemini-2.5-flash'
+ALT_LLM = 'gemini-2.5-flash-lite'
 
-FREE_TIER_MODELS = (
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash-preview-tts',
-    'gemini-3.1-flash-lite-preview',
-)
-
-SYSTEM_INSTRUCTION = (
+NUTRITIONIST_INSTRUCTION = (
     "Role: Expert Nutritionist & Food Data Analyst (2025-2026).\n"
     "Objective: Calculate nutritional values using professional estimation when specific details are missing."
 
@@ -47,60 +44,141 @@ SYSTEM_INSTRUCTION = (
 
 )
 
-
 logger = logging.getLogger(__name__)
 
-model_pool = cycle(FREE_TIER_MODELS)
-
-gemini_client = Client(api_key=GEMINI_API_KEY).aio
-
-config = types.GenerateContentConfig(
-    system_instruction=SYSTEM_INSTRUCTION,
+default_gemini_config = types.GenerateContentConfig(
     tools=[types.Tool(google_search=types.GoogleSearch())],
     temperature=0.2,
 )
 
+nutritionist_gemini_config = deepcopy(default_gemini_config)
+nutritionist_gemini_config.system_instruction = NUTRITIONIST_INSTRUCTION
 
-async def get_response(prompt: str, max_retries: int = 3):
-    current_model = next(model_pool)
 
-    while True:
-        try:
+class GeminiClient:
 
-            response = await gemini_client.models.generate_content(
-                model=current_model,
-                contents=prompt,
-                config=config
-            )
-            return response.text
+    def __init__(self, model, alt_models, config, rpd_threshold=5):
+        self.client = Client(api_key=GEMINI_API_KEY).aio
+        self.main_model = model
+        self.current_model = model
+        self.alt_models = list(alt_models)
+        self.config = config if config else deepcopy(default_gemini_config)
+        self._models_iter = iter(self.alt_models)
+        self._on_low_limit = Callable | None
 
-        except ClientError as e:
-            max_retries -= 1
-            # 429 - лимит запросов, 503/504 - перегрузка сервиса
-            if e.code in (429, 503):
-                current_model = next(model_pool)
-                logger.error(f'Лимит исчерпан. Переключаюсь на {current_model}...')
+    def set_low_limit_handler(self, handler):
+        """Регистрирует внешний обработчик для низких лимитов."""
+        self._on_low_limit = handler
 
-                if max_retries == 0:
-                    logger.error('Макс. количество попыток исчерпано. Прерываю...')
-                    raise e
+    def reset_models_iterator(self):
+        self._models_iter = iter(self.alt_models)
+        self.current_model = self.main_model
+        logger.info('Iterator reset to main model: %s', self.main_model)
 
-                continue
-            else:
-                raise e
+    @staticmethod
+    def model_switcher(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            other_errors_attempt = 0
+
+            while True:
+
+                try:
+                    return await func(self, *args, **kwargs)
+                except ClientError as e:
+                    if e.code == 429:
+                        logger.warning('Limit exhausted for %s', self.current_model)
+
+                        try:
+                            self.current_model = next(self._models_iter)
+                            logger.info('Switched to %s', self.current_model)
+                            await asyncio.sleep(1)
+                            continue
+
+                        except StopIteration:
+                            logger.error('All models limits have been exhausted.')
+
+                            await self._on_low_limit()
+                            self.reset_models_iterator()
+                            return None
+
+                    else:
+                        if other_errors_attempt >= 2:
+                            logger.error('Standard retry limit reached for error: %s', e)
+                            return None
+
+                        other_errors_attempt += 1
+                        wait = (other_errors_attempt + 1) * 2
+                        logger.info('%s\nRetrying in %s seconds...',e, wait)
+                        await asyncio.sleep(wait)
+
+        return wrapper
+
+    @model_switcher
+    async def get_response(self, prompt: str):
+        logger.info('Google LLM is - %s', self.current_model)
+
+        response = await self.client.models.generate_content(
+            model=self.current_model,
+            contents=prompt,
+            config=self.config
+        )
+        return response.text
+
+    async def parse_to_dto(self, data: str, date_) -> FeedResponse:
+        """Преобразует текстовый ответ LLM в валидированный объект DTO.
+
+        Args:
+            data: JSON-строка или текст с разметкой от модели.
+            date_: Дата и время создания записи.
+
+        Returns:
+            Объект FeedDTO с установленной датой.
+
+        Raises:
+            AIError: Если не удалось извлечь или распарсить JSON.
+        """
+        json_dict = clean_and_parse_json(data)
+        if not json_dict:
+            raise AIError("Can't parse LLM response as JSON")
+
+        return FeedResponse(**json_dict, created_at=date_)
 
 
 class ElevenLabsClient:
 
-    def __init__(self):
-        self.client = AsyncElevenLabs(api_key=ELEVEN_LABS_API_KEY)
+    def __init__(self, low_limit_threshold=2000):
+        self.client = AsyncElevenLabs(api_key=ELEVENLABS_API_KEY)
+        self.threshold = low_limit_threshold
+        self._on_low_limit: Coroutine | None = None
 
+    def set_low_limit_handler(self, handler):
+        """Регистрирует внешний обработчик для низких лимитов."""
+        self._on_low_limit = handler
+
+    @staticmethod
+    def log_limits(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+
+            result = await func(self, *args, **kwargs)
+
+            sub = await self.client.user.subscription.get()
+            remains = sub.character_limit - sub.character_count
+
+            logger.info('Character spent: %s | Remains: %s', sub.character_count, remains)
+            # Если лимит низкий и есть обработчик — вызываем его
+            if remains < self.threshold and self._on_low_limit:
+                await self._on_low_limit(remains)
+
+            return result
+
+        return wrapper
+
+    @log_limits
     async def speech_to_text(self, audio: bytes):
         return await self.client.speech_to_text.convert(
             model_id='scribe_v2',
             file=audio,
             language_code='ru',
         )
-
-
-elevenlabs_client = ElevenLabsClient()

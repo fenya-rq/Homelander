@@ -2,17 +2,20 @@ import asyncio
 import logging
 
 from src.tg.bot import bot as tg_bot, dp as tg_dp
-from src.storage.runner import migrate
+from src.tg.middlewares import DbSessionMiddleware
+from src.storage.db import get_session_pool
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('src.main')
 
 
 async def main() -> None:
-    logger.info('Start migration...')
-    # todo: make manage migrations via cli flag
-    await migrate()
+    session_pool = await get_session_pool()
+    tg_dp.update.outer_middleware(DbSessionMiddleware(session_pool))
 
-    await tg_dp.start_polling(tg_bot)
+    try:
+        await tg_dp.start_polling(tg_bot)
+    finally:
+        await session_pool.close()
 
 
 if __name__ == '__main__':

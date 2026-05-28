@@ -1,4 +1,6 @@
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import aiofiles
 
@@ -28,7 +30,8 @@ async def write_file(
         await file.write(content)
 
 
-#
-# def change_filename(filepath: Path) -> None:
-#     marked_as_ready = f'{filepath.stem}{FileMarks.PROCESSED}{filepath.suffix}'
-#     filepath.rename(Path(filepath.parent, marked_as_ready))
+def get_tz_offset(zone_info: ZoneInfo) -> str:
+    """Вспомогательный метод для специфики SQLite."""
+    now = datetime.now(zone_info)
+    utc_slip = int(now.utcoffset().seconds / 60)
+    return f'{utc_slip:+} minutes'

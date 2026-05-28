@@ -27,19 +27,25 @@
 * **Architecture:** `Stateless Manager` (синглтон) для безопасной работы в `asyncio` среде.
 ---
 
+## Используемые LLM
+    Gemini:
+    - MAIN_LLM = 'gemini-2.5-flash'
+    - ALT_LLM = 'gemini-2.5-flash-lite'
+    ElevenLabs:
+    - MAIN_LLM = 'scribe_v2'
+---
+
 ## 🚀 Быстрый старт
 coming soon
 
 ---
 ## 📝 Roadmap: План развития
 
-#### 1. Extended logging
+#### 1. Tests
 
-#### 2. Tests
+#### 2. CI/CD
 
-#### 3. CI/CD
-
-#### 4. Computer Vision (Photo-to-Kcal)
+#### 3. Computer Vision (Photo-to-Kcal)
 * **Multi-modal:** Хендлер на `F.photo` для приема изображений.
 * **Gemini Vision:** Отправка байтов фото в Gemini с промптом на распознавание состава и веса.
 * **Flow:** Распознавание -> Подтверждение пользователем -> Запись в ленту.

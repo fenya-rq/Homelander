@@ -5,7 +5,7 @@ import re
 import matplotlib.pyplot as plt
 from aiogram.types import BufferedInputFile
 
-from src.tg.dto import FeedDTO
+from src.tg.dto import FeedResponse
 
 
 def _extract_balanced_json(text: str) -> str | None:
@@ -58,7 +58,7 @@ def clean_and_parse_json(text: str) -> dict | None:
     return json.loads(json_str.strip())
 
 
-def generate_weekly_chart(data: list[FeedDTO]) -> BufferedInputFile:
+def generate_weekly_chart(data: list[FeedResponse]) -> BufferedInputFile:
     """Визуализирует недельную статистику калорий в виде столбчатой
     диаграммы.
 
